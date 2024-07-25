@@ -1,6 +1,6 @@
 
-test : src/main.cpp src/glad.c
-	g++ -o $@ $^ -I ./include -lglfw -lGL -lX11 -lpthread -lXrandr -lXi -ldl
+test : src/main.cpp src/stb_image.cpp
+	g++ -o $@ $^ -I ./include -lSDL2 -lGLESv2
 
 .PHONY: clean run
 

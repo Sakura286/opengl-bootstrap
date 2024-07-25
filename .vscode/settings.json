@@ -1,6 +1,7 @@
 {
     "files.associations": {
         "glfw3.h": "c",
-        "iostream": "cpp"
+        "iostream": "cpp",
+        "string": "cpp"
     }
 }
