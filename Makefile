@@ -1,8 +1,11 @@
 
-test : test.cpp
-	$(CC) -o $@ -I ./include -lglfw -lGL -lX11 -lpthread -lXrandr -lXi -ldl $^
+test : src/main.cpp src/glad.c
+	g++ -o $@ $^ -I ./include -lglfw -lGL -lX11 -lpthread -lXrandr -lXi -ldl
 
-.PHONY: clean
+.PHONY: clean run
+
+run :
+	./test
 
 clean :
 	rm test
