@@ -155,22 +155,27 @@ int SDL_main(int argc, char *args[])
     //ourShader.setInt("texture1", 1);
     // Update the window
 
-
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, texture0);
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, texture1);
 
-    ourShader.use();
-    glBindVertexArray(VAO);
-    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+    // ourShader.use();
+    // glBindVertexArray(VAO);
+    // glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
-    SDL_GL_SwapWindow(window);
+    // SDL_GL_SwapWindow(window);
 
     // Wait for the user to quit
     bool quit = false;
     while (!quit)
     {
+        ourShader.use();
+        glBindVertexArray(VAO);
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+
+        SDL_GL_SwapWindow(window);
+
         SDL_Event event;
         if (SDL_WaitEvent(&event) != 0) {
             if (event.type == SDL_QUIT) {
