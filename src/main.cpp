@@ -9,6 +9,7 @@
 
 #include "shader.hpp"
 #include "stb_image.h"
+#include "static_methods.hpp"
 
 using namespace std;
 
@@ -85,6 +86,10 @@ int SDL_main(int argc, char *args[])
         3, 1, 0  // 第二个三角形
     };
 
+    GLuint framebuffer;
+    glGenFramebuffers(1, &framebuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+
     unsigned int VBO, VAO, EBO;
     glGenVertexArrays(1, &VAO);
     glGenBuffers(1, &VBO);
@@ -108,73 +113,90 @@ int SDL_main(int argc, char *args[])
     glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
     glEnableVertexAttribArray(2);
 
-    unsigned int texture0, texture1;
+    unsigned int texture0;
     glGenTextures(1, &texture0);
     glBindTexture(GL_TEXTURE_2D, texture0);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    checkError("glTexParameteri");
+    
+
+    //GLint swizzleMask[] = {GL_BLUE, GL_GREEN, GL_RED, GL_ALPHA};
+    //glTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_RGBA_EXT, swizzleMask);
 
     int width, height, nrChannels;
-    unsigned char* data = stbi_load("pics/container.jpg", &width, &height, &nrChannels, 0);
+    stbi_ldr_to_hdr_scale(1.0f);
+    stbi_ldr_to_hdr_gamma(1.0f);
+    float* data = stbi_loadf("pics/container.jpg", &width, &height, &nrChannels, 0);
+    //unsigned char * data = stbi_load("pics/container.jpg", &width, &height, &nrChannels, 0);
     if (data)
     {
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
-        glGenerateMipmap(GL_TEXTURE_2D);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_FLOAT, data);
+        //glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+        checkError("glTexImage2D");
+        //glGenerateMipmap(GL_TEXTURE_2D);
+        //checkError("glGenerateMipmap");
+        printf("pic width is %d, height is %d\n", width, height);
     }
     else
     {
         std::cout << "Failed to load texture" << std::endl;
     }
-    stbi_image_free(data);
-
-    glGenTextures(1, &texture1);
-    glBindTexture(GL_TEXTURE_2D, texture1);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-
-    stbi_set_flip_vertically_on_load(true);
-    data = stbi_load("pics/awesomeface.png", &width, &height, &nrChannels, 0);
-    if (data)
-    {
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
-        glGenerateMipmap(GL_TEXTURE_2D);
-    }
-    else
-    {
-        std::cout << "Failed to load texture" << std::endl;
-    }
-    stbi_image_free(data);
+    //stbi_image_free(data);
 
     ourShader.use();
     glUniform1i(glGetUniformLocation(ourShader.ID, "texture0"), 0);
-    glUniform1i(glGetUniformLocation(ourShader.ID, "texture1"), 1);
-    //ourShader.setInt("texture1", 1);
     // Update the window
 
+    // glActiveTexture(GL_TEXTURE0);
+    // glBindTexture(GL_TEXTURE_2D, texture0);
+
+    glBindVertexArray(VAO);
+    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+
+    
+
+
+    // Generate texture
+    GLuint texColorBuffer;
+    glGenTextures(1, &texColorBuffer);
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, texture0);
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, texture1);
+    glBindTexture(GL_TEXTURE_2D, texColorBuffer);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_FLOAT, data);
+    checkError("glTexImage2D");
+    //glBindTexture(GL_TEXTURE_2D, 0);
 
-    // ourShader.use();
-    // glBindVertexArray(VAO);
-    // glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+    // Attach it to currently bound framebuffer object
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texColorBuffer, 0);
+    checkError("glFramebufferTexture2D");
+    //glBindTexture(GL_TEXTURE_2D, 0);
 
-    // SDL_GL_SwapWindow(window);
+    ourShader.use();
+
+    glBindVertexArray(VAO);
+    checkError("glBindVertexArray");
+    saveFrameBuff("/usb0/stkimg/tes.ppm", framebuffer, width, height);
+    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+    checkError("glDrawElements");
+
+    saveFrameBuff("/usb0/stkimg/tes2.ppm", framebuffer, width, height);
+
+    //SDL_GL_SwapWindow(window);
 
     // Wait for the user to quit
     bool quit = false;
     while (!quit)
     {
         ourShader.use();
-        glBindVertexArray(VAO);
-        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
-        SDL_GL_SwapWindow(window);
+        glBindVertexArray(VAO);
+        // glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+
+        // SDL_GL_SwapWindow(window);
 
         SDL_Event event;
         if (SDL_WaitEvent(&event) != 0) {
