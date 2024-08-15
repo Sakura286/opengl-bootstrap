@@ -10,6 +10,7 @@
 #include "shader.hpp"
 #include "stb_image.h"
 #include "static_methods.hpp"
+#include "glutil.hpp"
 
 using namespace std;
 
@@ -66,9 +67,7 @@ int SDL_main(int argc, char *args[])
         return EXIT_FAILURE;
     }
 
-
-
-    // start
+    // opengl start
     glClearColor(1.0f, 1.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
 
@@ -85,10 +84,6 @@ int SDL_main(int argc, char *args[])
         2, 3, 1, // 第一个三角形
         3, 1, 0  // 第二个三角形
     };
-
-    GLuint framebuffer;
-    glGenFramebuffers(1, &framebuffer);
-    glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
 
     unsigned int VBO, VAO, EBO;
     glGenVertexArrays(1, &VAO);
@@ -113,77 +108,72 @@ int SDL_main(int argc, char *args[])
     glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
     glEnableVertexAttribArray(2);
 
-    unsigned int texture0;
-    glGenTextures(1, &texture0);
-    glBindTexture(GL_TEXTURE_2D, texture0);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    checkError("glTexParameteri");
+    // unsigned int texture0;
+    // glGenTextures(1, &texture0);
+    // glBindTexture(GL_TEXTURE_2D, texture0);
+    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    // checkError("glTexParameteri");
     
 
     //GLint swizzleMask[] = {GL_BLUE, GL_GREEN, GL_RED, GL_ALPHA};
     //glTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_RGBA_EXT, swizzleMask);
 
     int width, height, nrChannels;
-    stbi_ldr_to_hdr_scale(1.0f);
-    stbi_ldr_to_hdr_gamma(1.0f);
-    float* data = stbi_loadf("pics/container.jpg", &width, &height, &nrChannels, 0);
-    //unsigned char * data = stbi_load("pics/container.jpg", &width, &height, &nrChannels, 0);
-    if (data)
+    bool tex_create_flag;
+
+    GLuint tex1 = mygl::createTextureFromPic(
+            "./pics/awesomeface.png", width, height, nrChannels,
+            mygl::MYGL_RGBA, mygl::MYGL_FLOAT,
+            tex_create_flag);
+
+    if (!tex_create_flag)
     {
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_FLOAT, data);
-        //glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
-        checkError("glTexImage2D");
-        //glGenerateMipmap(GL_TEXTURE_2D);
-        //checkError("glGenerateMipmap");
-        printf("pic width is %d, height is %d\n", width, height);
+        printf("Texture create failed.\n");
+        return EXIT_FAILURE;
     }
-    else
-    {
-        std::cout << "Failed to load texture" << std::endl;
-    }
-    //stbi_image_free(data);
 
-    ourShader.use();
-    glUniform1i(glGetUniformLocation(ourShader.ID, "texture0"), 0);
-    // Update the window
-
-    // glActiveTexture(GL_TEXTURE0);
-    // glBindTexture(GL_TEXTURE_2D, texture0);
-
-    glBindVertexArray(VAO);
-    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-
-    
-
-
-    // Generate texture
-    GLuint texColorBuffer;
-    glGenTextures(1, &texColorBuffer);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, texColorBuffer);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_FLOAT, data);
-    checkError("glTexImage2D");
-    //glBindTexture(GL_TEXTURE_2D, 0);
+    GLuint fbo1, fbo2;
+    glGenFramebuffers(1, &fbo1);
+    glGenFramebuffers(1, &fbo2);
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo1);
 
     // Attach it to currently bound framebuffer object
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texColorBuffer, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex1, 0);
     checkError("glFramebufferTexture2D");
-    //glBindTexture(GL_TEXTURE_2D, 0);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    const int TEX_EDGE = 1024;
+    GLuint tex2 = mygl::createTexture(TEX_EDGE, TEX_EDGE);
+    checkError("texcreated");
+    glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA16F, TEX_EDGE, TEX_EDGE);
+    checkError("glTexStorage2D");
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo2);
+    checkError("glBindFramebuffer");
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex2, 0);
+    checkError("glFramebufferTexture2D");
+
+    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_BLEND);
+    glClear(GL_STENCIL_BUFFER_BIT);
+    glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_FALSE);
 
     ourShader.use();
-
+    checkError("gluse");
+    glBindTexture(GL_TEXTURE_2D, tex1);
+    checkError("glBindTexture");
     glBindVertexArray(VAO);
     checkError("glBindVertexArray");
-    saveFrameBuff("/usb0/stkimg/tes.ppm", framebuffer, width, height);
+    glUniform1i(glGetUniformLocation(ourShader.ID, "texture0"), 0);
+    checkError("glUniform1i");
+    glBindTexture(GL_TEXTURE_2D, tex1);
+    saveFrameBuff("/usb0/stkimg/fbo1.ppm", fbo1, width, height);
+    saveFrameBuff("/usb0/stkimg/fbo2_before.ppm", fbo2, TEX_EDGE, TEX_EDGE);
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
     checkError("glDrawElements");
-
-    saveFrameBuff("/usb0/stkimg/tes2.ppm", framebuffer, width, height);
+    saveFrameBuff("/usb0/stkimg/fbo2_end.ppm", fbo2, TEX_EDGE, TEX_EDGE);
 
     //SDL_GL_SwapWindow(window);
 
@@ -191,12 +181,13 @@ int SDL_main(int argc, char *args[])
     bool quit = false;
     while (!quit)
     {
+        break;
         ourShader.use();
 
         glBindVertexArray(VAO);
-        // glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
-        // SDL_GL_SwapWindow(window);
+        SDL_GL_SwapWindow(window);
 
         SDL_Event event;
         if (SDL_WaitEvent(&event) != 0) {

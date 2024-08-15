@@ -1,9 +1,13 @@
+#ifndef STATIC_METHODS_H
+#define STATIC_METHODS_H
+
 #include<cstdio>
 #include<cstdlib>
 #include<cstdint>
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_opengles2.h>
 #include <GLES3/gl3.h>
+
 
 GLint get_current_fbo()
 {
@@ -78,7 +82,7 @@ uint32_t half_to_int32(uint16_t float16_value)
         float32_value = (sign << 31) | ((exponent + (127-15)) << 23) | (fraction << 13);
     }
     float b =  *((float*)&float32_value);
-    uint32_t c = (uint32_t)(b * 256);
+    uint32_t c = (uint32_t)(b * 256) == 256 ? 255 : (uint32_t)(b * 256);
     return c;
 }
 
@@ -171,14 +175,12 @@ void saveFrameBuff(const char* fileName, GLuint new_fbo, GLuint width, GLuint he
         printf("!!!!! b file cannot open !!!!!\n");
     fprintf(bFile, "P6\n%d %d\n255\n", width, height);
 
-
-
     switch (type)
     {
         case GL_HALF_FLOAT:
             {
             GLhalf* iBuf =  (GLhalf*)malloc(iBufLen * sizeof(GLhalf));
-            glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+            glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
             glReadPixels(0, 0, width, height, format, type, iBuf);
             GLhalf* piBuf = iBuf;
             for (int i = 0; i < iBufLen / dimension; i++)
@@ -187,16 +189,15 @@ void saveFrameBuff(const char* fileName, GLuint new_fbo, GLuint width, GLuint he
                 rgb_array[0] = half_to_int32(*(piBuf));
                 rgb_array[1] = half_to_int32(*(piBuf + 1));
                 rgb_array[2] = half_to_int32(*(piBuf + 2));
-                rgb_array[3] = half_to_int32(*(piBuf + 3));
+                if (dimension == 4)  rgb_array[3] = half_to_int32(*(piBuf + 3));
 
                 fprintf(rgbFile, "(%4hhu, %4hhu, %4hhu) ", rgb_array[0], rgb_array[1], rgb_array[2]);
-                fprintf(alphaFile, "%4u ", rgb_array[3]);
+                if (dimension == 4) fprintf(alphaFile, "%4u ", rgb_array[3]);
 
                 if ((i + 1) % width == 0)
                 {
                     fprintf(rgbFile, "\n");
-                    if (dimension > 3);
-                    fprintf(alphaFile, "\n");
+                    if (dimension == 4) fprintf(alphaFile, "\n");
                 }
 
                 static uint8_t rgb_array_w[4];
@@ -214,11 +215,16 @@ void saveFrameBuff(const char* fileName, GLuint new_fbo, GLuint width, GLuint he
                 fwrite(rgb_array_w + 2, 1, 1, bFile);
                 fwrite(rgb_array_w + 2, 1, 1, bFile);
                 fwrite(rgb_array_w + 2, 1, 1, bFile);
-                rgb_array_w[3] = (rgb_array[2] > 255) ? (uint8_t) 255 : (uint8_t)rgb_array[3];
-                fwrite(rgb_array_w + 3, 1, 1, aFile);
-                fwrite(rgb_array_w + 3, 1, 1, aFile);
-                fwrite(rgb_array_w + 3, 1, 1, aFile);
-                fwrite(rgb_array_w, 3, 1, oFile);
+
+                if (dimension == 4)
+                {
+                    rgb_array_w[3] = (rgb_array[2] > 255) ? (uint8_t) 255 : (uint8_t)rgb_array[3];
+                    fwrite(rgb_array_w + 3, 1, 1, aFile);
+                    fwrite(rgb_array_w + 3, 1, 1, aFile);
+                    fwrite(rgb_array_w + 3, 1, 1, aFile);
+                    fwrite(rgb_array_w, 3, 1, oFile);
+                }
+
                 piBuf += dimension;
             }
             free(iBuf);
@@ -233,15 +239,15 @@ void saveFrameBuff(const char* fileName, GLuint new_fbo, GLuint width, GLuint he
             for (int i = 0; i < iBufLen / dimension; i++)
             {
                 fprintf(rgbFile, "(%4hhu, %4hhu, %4hhu) ", piBuf[0], piBuf[1], piBuf[2]);
-                if (dimension > 3)
-                fprintf(alphaFile, "%4hhu ", piBuf[3]);
+                if (dimension == 4) fprintf(alphaFile, "%4hhu ", piBuf[3]);
 
                 if ((i + 1) % width == 0)
                 {
                     fprintf(rgbFile, "\n");
-                    fprintf(alphaFile, "\n");
+                    if (dimension == 4) fprintf(alphaFile, "\n");
                 }
                 fwrite(piBuf, 3, 1, oFile);
+
                 fwrite(piBuf, 1, 1, rFile);
                 fwrite(piBuf, 1, 1, rFile);
                 fwrite(piBuf, 1, 1, rFile);
@@ -254,9 +260,13 @@ void saveFrameBuff(const char* fileName, GLuint new_fbo, GLuint width, GLuint he
                 fwrite(piBuf + 2, 1, 1, bFile);
                 fwrite(piBuf + 2, 1, 1, bFile);
 
-                fwrite(piBuf + 3, 1, 1, aFile);
-                fwrite(piBuf + 3, 1, 1, aFile);
-                fwrite(piBuf + 3, 1, 1, aFile);
+                if (dimension == 4)
+                {
+                    fwrite(piBuf + 3, 1, 1, aFile);
+                    fwrite(piBuf + 3, 1, 1, aFile);
+                    fwrite(piBuf + 3, 1, 1, aFile);
+                }
+
                 piBuf += dimension;
             }
             free(iBuf);
@@ -266,6 +276,8 @@ void saveFrameBuff(const char* fileName, GLuint new_fbo, GLuint width, GLuint he
             printf("!!!!! Not a valid color type: 0x%x\n", type);
             return;
     }
+
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
 
     fclose(oFile);
     fclose(aFile);
@@ -281,10 +293,11 @@ void saveFrameBuff(const char* fileName, GLuint new_fbo, GLuint width, GLuint he
     }
 }
 
-void checkError(char* label)
+void checkError(const char* label)
 {
     GLenum err = glGetError();
     if (err != GL_NO_ERROR)
         printf("%s: err is 0x%x\n", label, err);
 }
 
+#endif
